@@ -1,7 +1,7 @@
-local ServerObjectStorage = {}
+local ObjectStorage = {}
 
-ServerObjectStorage.ObjectsById = {}
-ServerObjectStorage.ObjectsByParent = {}
+ObjectStorage.ObjectsById = {}
+ObjectStorage.ObjectsByParent = {}
 
 local function IsDescendantOf(Object, ParentClassReference)
 	local CurrentMetatable = getmetatable(Object)
@@ -20,7 +20,7 @@ local function IsDescendantOf(Object, ParentClassReference)
 	return false
 end
 
-function ServerObjectStorage:AddObject(ObjectToAdd)
+function ObjectStorage:AddObject(ObjectToAdd)
 	if typeof(ObjectToAdd) ~= "table" then
 		return
 	end
@@ -33,7 +33,7 @@ function ServerObjectStorage:AddObject(ObjectToAdd)
 	self.ObjectsById[ObjectId] = ObjectToAdd
 end
 
-function ServerObjectStorage:RemoveObject(ObjectToRemove)
+function ObjectStorage:RemoveObject(ObjectToRemove)
 	if typeof(ObjectToRemove) ~= "table" then
 		return
 	end
@@ -50,7 +50,7 @@ function ServerObjectStorage:RemoveObject(ObjectToRemove)
 	end
 end
 
-function ServerObjectStorage:IsObjectADescendantOf(Object, ParentClassReference)
+function ObjectStorage:IsObjectADescendantOf(Object, ParentClassReference)
 	if typeof(Object) ~= "table" or not getmetatable(Object) or not getmetatable(Object).__index then
 		return false
 	end
@@ -58,7 +58,7 @@ function ServerObjectStorage:IsObjectADescendantOf(Object, ParentClassReference)
 	return IsDescendantOf(Object, ParentClassReference)
 end
 
-function ServerObjectStorage:GetAllObjectsWithParent(ParentClassReference, Exclude)
+function ObjectStorage:GetAllObjectsWithParent(ParentClassReference, Exclude)
 	local CachedObjects = self.ObjectsByParent[ParentClassReference]
 
 	if not CachedObjects then
@@ -95,4 +95,4 @@ function ServerObjectStorage:GetAllObjectsWithParent(ParentClassReference, Exclu
 	return FilteredObjects
 end
 
-return ServerObjectStorage
+return ObjectStorage

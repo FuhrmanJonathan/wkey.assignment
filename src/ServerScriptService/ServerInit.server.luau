@@ -1,7 +1,7 @@
-local Systems = require(game.ReplicatedFirst.SystemLoader):Get()
+local EnemySpawner = require(game.ServerScriptService.Systems.EnemySpawner)
 
 local function ServerInitializationPipeline()
-    Systems.EnemySpawnerSystem:Start()
+    EnemySpawner:Start()
 end
 
 ServerInitializationPipeline()
