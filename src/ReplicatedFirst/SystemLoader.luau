@@ -15,9 +15,8 @@ end
 
 function Systems:Get()
 	if not self.Cache then
-		local SharedFolder =
-			game.ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Systems")
-
+		local SharedFolder = game.ReplicatedStorage:WaitForChild("Systems")
+        
 		self.Cache = LoadModulesFrom(SharedFolder)
 	end
 

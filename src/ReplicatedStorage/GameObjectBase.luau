@@ -1,4 +1,4 @@
-local Systems = require(game.ReplicatedStorage.Shared.SystemLoader):Get()
+local Systems = require(game.ReplicatedFirst.SystemLoader):Get()
 
 local GameObjectBase = {}
 GameObjectBase.__index = GameObjectBase
