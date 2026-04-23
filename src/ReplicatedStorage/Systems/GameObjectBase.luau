@@ -1,12 +1,14 @@
 local Systems = require(game.ReplicatedFirst.SystemLoader):Get()
 
+local HttpService = game:GetService("HttpService")
+
 local GameObjectBase = {}
 GameObjectBase.__index = GameObjectBase
 
 function GameObjectBase.New()
 	local self = setmetatable({}, GameObjectBase)
 	
-	self.ObjectId = nil
+	self.ObjectId = HttpService:GenerateGUID(false)
 
 	Systems.ServerObjectStorage:AddObject(self)
 
