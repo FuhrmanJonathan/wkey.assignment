@@ -1,5 +1,6 @@
 local ObjectStorage = require(game.ServerScriptService.Systems.ObjectStorage)
-local EnemyBase = require(game.ReplicatedStorage.Systems.EnemyBase)
+local ObjectSpawner = require(game.ServerScriptService.Systems.ObjectSpawner)
+local EnemyBase = require(game.ServerScriptService.Systems.Classes.EnemyBase)
 
 local EnemySpawner = {}
 
@@ -35,7 +36,7 @@ function EnemySpawner:Step()
         return
     end
     
-    local EnemyObject = EnemyBase.New()
+    local EnemyObject = ObjectSpawner:Spawn(EnemyBase)
     ObjectStorage:AddObject(EnemyObject)
 end
 

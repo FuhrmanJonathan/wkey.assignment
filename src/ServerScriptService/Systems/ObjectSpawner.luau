@@ -1,6 +1,7 @@
-local ObjectSpawner = {}
+local ObjectStorage = require(game.ServerScriptService.Systems.ObjectStorage)
+local ServerRendering = require(game.ServerScriptService.Systems.ServerRendering)
 
-local ServerObjectStorage = require(script.Parent.ServerObjectStorage)
+local ObjectSpawner = {}
 
 ObjectSpawner.ActiveObjects = {}
 
@@ -9,7 +10,13 @@ function ObjectSpawner:Spawn(ClassReference, ...)
 	local Object = ClassReference.New(...)
 	local ObjectId = Object.ObjectId
 
-	ServerObjectStorage:AddObject(Object)
+    Object:Spawn()
+
+	ObjectStorage:AddObject(Object)
+
+    if Object.Replicate then
+	    ServerRendering:RegisterObject(Object)
+    end
 
 	self.ActiveObjects[ObjectId] = Object
 
@@ -31,7 +38,11 @@ function ObjectSpawner:Destroy(Object)
 		Object:Destroy()
 	end
 
-	ServerObjectStorage:RemoveObject(Object)
+    if Object.Replicate then
+	    ServerRendering:RemoveObject(Object.ObjectId)
+    end
+
+	ObjectStorage:RemoveObject(Object)
 
 	self.ActiveObjects[ObjectId] = nil
 end

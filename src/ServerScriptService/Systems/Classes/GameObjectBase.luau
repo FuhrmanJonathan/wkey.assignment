@@ -11,6 +11,10 @@ function GameObjectBase.New()
 	return self
 end
 
+function GameObjectBase:Spawn()
+
+end
+
 function GameObjectBase:Destroy()
 	
 end
