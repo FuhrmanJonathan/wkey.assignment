@@ -8,8 +8,6 @@ For visualization, the demo is oriented in an *isometric perspective to make ene
 
 Enemies are implemented using simple square parts with randomized visual attributes generated deterministically, ensuring that all clients see consistent enemy variations without requiring additional replication data.
 
----
-
 ## Enemy Behavior
 
 Enemies dynamically target the nearest player located within the platform bounds.
@@ -21,8 +19,6 @@ When approaching a player:
 - When within close proximity, enemies deal damage  
 
 This behavior was chosen to create responsive enemy interactions while keeping server-side computation lightweight.
-
----
 
 ## Runtime Controls
 
