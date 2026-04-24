@@ -1,18 +1,34 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local RenderSpawn = ReplicatedStorage.Remotes.RenderSpawn
-local RenderUpdate = ReplicatedStorage.Remotes.RenderUpdate
-local RenderDestroy = ReplicatedStorage.Remotes.RenderDestroy
-local RenderEvent = ReplicatedStorage.Remotes.RenderEvent
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+local RenderSpawn = Remotes:WaitForChild("RenderSpawn")
+local RenderUpdate = Remotes:WaitForChild("RenderUpdate")
+local RenderDestroy = Remotes:WaitForChild("RenderDestroy")
+local RenderEvent = Remotes:WaitForChild("RenderEvent")
 
 local ModelCreationRegistry = require(ReplicatedStorage.Systems.ModelCreationRegistry)
 
 local ClientRendering = {}
 
 ClientRendering.VisualObjects = {}
+ClientRendering.Started = false
+ClientRendering.LerpSpeed = 10
+ClientRendering.PlatformY = 0
+ClientRendering.PositionPrecision = 10
+
+local function Dequantize(Number, Precision)
+	return Number / Precision
+end
 
 function ClientRendering:Start()
+	if self.Started then
+		return
+	end
+
+	self.Started = true
+
 	RenderSpawn.OnClientEvent:Connect(function(SpawnData)
 		self:CreateObject(SpawnData)
 	end)
@@ -34,25 +50,37 @@ function ClientRendering:Start()
 	end)
 end
 
+function ClientRendering:GetPositionFromData(X, Z)
+	return Vector3.new(
+		Dequantize(X, self.PositionPrecision),
+		self.PlatformY,
+		Dequantize(Z, self.PositionPrecision)
+	)
+end
+
 function ClientRendering:CreateObject(SpawnData)
 	local CreateFunction = ModelCreationRegistry[SpawnData.ModelKey]
 	if not CreateFunction then
+		warn("No model creation function for:", SpawnData.ModelKey)
 		return
 	end
 
 	local Model = CreateFunction(SpawnData.ModelVarianceSeed)
 	if not Model then
+		warn("Model creation failed for:", SpawnData.ModelKey)
 		return
 	end
 
-	Model:PivotTo(CFrame.new(SpawnData.Position))
+	local Position = self:GetPositionFromData(SpawnData.X, SpawnData.Z)
+
+	Model:PivotTo(CFrame.new(Position))
 	Model.Parent = workspace
 
 	self.VisualObjects[SpawnData.ObjectId] = {
 		ObjectId = SpawnData.ObjectId,
 		Model = Model,
-		CurrentPosition = SpawnData.Position,
-		TargetPosition = SpawnData.Position,
+		CurrentPosition = Position,
+		TargetPosition = Position,
 		ModelKey = SpawnData.ModelKey,
 		ModelVarianceSeed = SpawnData.ModelVarianceSeed,
 	}
@@ -60,9 +88,13 @@ end
 
 function ClientRendering:ApplyUpdates(UpdatePacket)
 	for _, UpdateData in ipairs(UpdatePacket) do
-		local VisualObject = self.VisualObjects[UpdateData.ObjectId]
+		local ObjectId = UpdateData[1]
+		local X = UpdateData[2]
+		local Z = UpdateData[3]
+
+		local VisualObject = self.VisualObjects[ObjectId]
 		if VisualObject then
-			VisualObject.TargetPosition = UpdateData.Position
+			VisualObject.TargetPosition = self:GetPositionFromData(X, Z)
 		end
 	end
 end
@@ -88,10 +120,15 @@ function ClientRendering:HandleEvent(ObjectId, EventName, Data)
 end
 
 function ClientRendering:RenderStep(DeltaTime)
-	local Alpha = math.clamp(DeltaTime * 10, 0, 1)
+	local Alpha = math.clamp(DeltaTime * self.LerpSpeed, 0, 1)
 
 	for _, VisualObject in pairs(self.VisualObjects) do
-		VisualObject.CurrentPosition = VisualObject.CurrentPosition:Lerp(VisualObject.TargetPosition, Alpha)
+		if (VisualObject.CurrentPosition - VisualObject.TargetPosition).Magnitude < 0.01 then
+			continue
+		end
+
+		VisualObject.CurrentPosition =
+			VisualObject.CurrentPosition:Lerp(VisualObject.TargetPosition, Alpha)
 
 		if VisualObject.Model then
 			VisualObject.Model:PivotTo(CFrame.new(VisualObject.CurrentPosition))

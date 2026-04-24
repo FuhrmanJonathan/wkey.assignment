@@ -31,6 +31,12 @@ function ObjectStorage:AddObject(ObjectToAdd)
 	end
 
 	self.ObjectsById[ObjectId] = ObjectToAdd
+
+	for ParentClassReference, CachedObjects in pairs(self.ObjectsByParent) do
+		if IsDescendantOf(ObjectToAdd, ParentClassReference) then
+			CachedObjects[ObjectId] = ObjectToAdd
+		end
+	end
 end
 
 function ObjectStorage:RemoveObject(ObjectToRemove)
@@ -45,13 +51,18 @@ function ObjectStorage:RemoveObject(ObjectToRemove)
 
 	self.ObjectsById[ObjectId] = nil
 
-	for ParentClassReference, Objects in pairs(self.ObjectsByParent) do
-		Objects[ObjectId] = nil
+	for _, CachedObjects in pairs(self.ObjectsByParent) do
+		CachedObjects[ObjectId] = nil
 	end
 end
 
 function ObjectStorage:IsObjectADescendantOf(Object, ParentClassReference)
-	if typeof(Object) ~= "table" or not getmetatable(Object) or not getmetatable(Object).__index then
+	if typeof(Object) ~= "table" then
+		return false
+	end
+
+	local Meta = getmetatable(Object)
+	if not Meta or not Meta.__index then
 		return false
 	end
 
@@ -66,19 +77,18 @@ function ObjectStorage:GetAllObjectsWithParent(ParentClassReference, Exclude)
 		self.ObjectsByParent[ParentClassReference] = CachedObjects
 
 		for ObjectId, TrackedObject in pairs(self.ObjectsById) do
-			if getmetatable(TrackedObject) and getmetatable(TrackedObject).__index then
-				if IsDescendantOf(TrackedObject, ParentClassReference) then
-					CachedObjects[ObjectId] = TrackedObject
-				end
+			if IsDescendantOf(TrackedObject, ParentClassReference) then
+				CachedObjects[ObjectId] = TrackedObject
 			end
 		end
 	end
 
-	local FilteredObjects = {}
+	local Result = {}
 	local ExcludeSet = nil
 
 	if Exclude then
 		ExcludeSet = {}
+
 		for _, Object in pairs(Exclude) do
 			if typeof(Object) == "table" and Object.ObjectId then
 				ExcludeSet[Object.ObjectId] = true
@@ -88,11 +98,11 @@ function ObjectStorage:GetAllObjectsWithParent(ParentClassReference, Exclude)
 
 	for ObjectId, Object in pairs(CachedObjects) do
 		if not ExcludeSet or not ExcludeSet[ObjectId] then
-			table.insert(FilteredObjects, Object)
+			table.insert(Result, Object)
 		end
 	end
 
-	return FilteredObjects
+	return Result
 end
 
 return ObjectStorage
