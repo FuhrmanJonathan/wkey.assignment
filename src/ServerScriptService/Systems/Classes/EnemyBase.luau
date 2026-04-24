@@ -33,6 +33,7 @@ function EnemyBase:FindCharacterTarget()
 end
 
 function EnemyBase:Simulate(DeltaTime)
+	print(self.Position)
 	if self.CharacterTarget and self.CharacterTarget.PrimaryPart then
 		local Direction = (self.CharacterTarget.PrimaryPart.Position - self.Position).Unit
 		self.Position = self.Position + Direction * self.Speed * DeltaTime
