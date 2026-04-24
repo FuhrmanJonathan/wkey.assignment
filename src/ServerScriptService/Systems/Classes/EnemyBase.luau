@@ -12,4 +12,8 @@ function EnemyBase.New(...)
 	return self
 end
 
+function EnemyBase:Simulate(DeltaTime)
+
+end
+
 return EnemyBase
