@@ -1,4 +1,5 @@
 local ReplicatedSpriteBase = require(script.Parent.ReplicatedSpriteBase)
+local Config = require(game.ReplicatedStorage.Config)
 
 local EnemyBase = {}
 EnemyBase.__index = EnemyBase
@@ -11,7 +12,7 @@ function EnemyBase.New(...)
 
 	self.Target = nil
 
-	self.Speed = 3
+	self.Speed = 6
 	self.AttackDamage = 10
 	self.AttackCooldown = 1
 
@@ -33,10 +34,9 @@ function EnemyBase:FindCharacterTarget()
 end
 
 function EnemyBase:Simulate(DeltaTime)
-	print(self.Position)
-	if self.CharacterTarget and self.CharacterTarget.PrimaryPart then
+	if self.CharacterTarget then
 		local Direction = (self.CharacterTarget.PrimaryPart.Position - self.Position).Unit
-		self.Position = self.Position + Direction * self.Speed * DeltaTime
+		self.Position = (self.Position + Direction * self.Speed * DeltaTime) * Vector3.new(1, 0, 1) + Vector3.new(0, Config.YLevel, 0)
 	else
 		self.CharacterTarget = self:FindCharacterTarget()
 	end

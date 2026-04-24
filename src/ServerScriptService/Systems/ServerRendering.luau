@@ -13,9 +13,8 @@ local ServerRendering = {}
 
 ServerRendering.ReplicatedObjects = {}
 ServerRendering.LastUpdate = 0
-ServerRendering.UpdateInterval = 0.15
+ServerRendering.UpdateInterval = 0.25
 ServerRendering.PositionThreshold = 0.1
-ServerRendering.PlatformY = 0
 ServerRendering.PositionPrecision = 10
 ServerRendering.Started = false
 

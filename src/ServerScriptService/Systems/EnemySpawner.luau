@@ -4,8 +4,8 @@ local EnemyBase = require(game.ServerScriptService.Systems.Classes.EnemyBase)
 
 local EnemySpawner = {}
 
-EnemySpawner.SpawnRate = 1
-EnemySpawner.MaxEnemies = 1
+EnemySpawner.SpawnRate = 10
+EnemySpawner.MaxEnemies = 100
 EnemySpawner.Running = false
 
 function EnemySpawner:Start()

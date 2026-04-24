@@ -9,14 +9,15 @@ local RenderDestroy = Remotes:WaitForChild("RenderDestroy")
 local RenderEvent = Remotes:WaitForChild("RenderEvent")
 
 local ModelCreationRegistry = require(ReplicatedStorage.Systems.ModelCreationRegistry)
+local Config = require(ReplicatedStorage.Config)
 
 local ClientRendering = {}
 
 ClientRendering.VisualObjects = {}
 ClientRendering.Started = false
-ClientRendering.LerpSpeed = 10
-ClientRendering.PlatformY = 0
 ClientRendering.PositionPrecision = 10
+ClientRendering.CorrectionSpeed = 1
+ClientRendering.VelocityDecayTime = 0.3
 
 local function Dequantize(Number, Precision)
 	return Number / Precision
@@ -53,7 +54,7 @@ end
 function ClientRendering:GetPositionFromData(X, Z)
 	return Vector3.new(
 		Dequantize(X, self.PositionPrecision),
-		self.PlatformY,
+		Config.YLevel,
 		Dequantize(Z, self.PositionPrecision)
 	)
 end
@@ -61,13 +62,11 @@ end
 function ClientRendering:CreateObject(SpawnData)
 	local CreateFunction = ModelCreationRegistry[SpawnData.ModelKey]
 	if not CreateFunction then
-		warn("No model creation function for:", SpawnData.ModelKey)
 		return
 	end
 
 	local Model = CreateFunction(SpawnData.ModelVarianceSeed)
 	if not Model then
-		warn("Model creation failed for:", SpawnData.ModelKey)
 		return
 	end
 
@@ -77,25 +76,48 @@ function ClientRendering:CreateObject(SpawnData)
 	Model.Parent = workspace
 
 	self.VisualObjects[SpawnData.ObjectId] = {
-		ObjectId = SpawnData.ObjectId,
-		Model = Model,
-		CurrentPosition = Position,
-		TargetPosition = Position,
-		ModelKey = SpawnData.ModelKey,
+		ObjectId          = SpawnData.ObjectId,
+		Model             = Model,
+		ModelKey          = SpawnData.ModelKey,
 		ModelVarianceSeed = SpawnData.ModelVarianceSeed,
+
+		-- The smoothed visual position driven each RenderStepped
+		CurrentPosition   = Position,
+
+		-- Last authoritative position received from the server
+		ServerPosition    = Position,
+
+		-- Estimated movement per second derived from consecutive server updates
+		Velocity          = Vector3.zero,
+
+		-- tick() timestamp of the most recent server update
+		LastUpdateTime    = tick(),
 	}
 end
 
 function ClientRendering:ApplyUpdates(UpdatePacket)
+	local Now = tick()
+
 	for _, UpdateData in ipairs(UpdatePacket) do
 		local ObjectId = UpdateData[1]
 		local X = UpdateData[2]
 		local Z = UpdateData[3]
 
 		local VisualObject = self.VisualObjects[ObjectId]
-		if VisualObject then
-			VisualObject.TargetPosition = self:GetPositionFromData(X, Z)
+		if not VisualObject then
+			continue
 		end
+
+		local NewServerPosition = self:GetPositionFromData(X, Z)
+		local DeltaTime = Now - VisualObject.LastUpdateTime
+
+		if DeltaTime >= 0.005 then
+			local Displacement = NewServerPosition - VisualObject.ServerPosition
+			VisualObject.Velocity  = Displacement / DeltaTime
+		end
+
+		VisualObject.ServerPosition = NewServerPosition
+		VisualObject.LastUpdateTime = Now
 	end
 end
 
@@ -120,15 +142,23 @@ function ClientRendering:HandleEvent(ObjectId, EventName, Data)
 end
 
 function ClientRendering:RenderStep(DeltaTime)
-	local Alpha = math.clamp(DeltaTime * self.LerpSpeed, 0, 1)
+	local Now = tick()
 
 	for _, VisualObject in pairs(self.VisualObjects) do
-		if (VisualObject.CurrentPosition - VisualObject.TargetPosition).Magnitude < 0.01 then
-			continue
-		end
+		local TimeSinceUpdate = Now - VisualObject.LastUpdateTime
 
+		local VelocityWeight = math.clamp(
+			1 - (TimeSinceUpdate / self.VelocityDecayTime),
+			0,
+			1
+		)
+		local DecayedVelocity = VisualObject.Velocity * VelocityWeight
+		local PredictedPosition = VisualObject.ServerPosition
+			+ DecayedVelocity * TimeSinceUpdate
+
+		local Alpha = math.clamp(DeltaTime * self.CorrectionSpeed, 0, 1)
 		VisualObject.CurrentPosition =
-			VisualObject.CurrentPosition:Lerp(VisualObject.TargetPosition, Alpha)
+			VisualObject.CurrentPosition:Lerp(PredictedPosition, Alpha)
 
 		if VisualObject.Model then
 			VisualObject.Model:PivotTo(CFrame.new(VisualObject.CurrentPosition))
