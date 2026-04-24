@@ -9,7 +9,9 @@ function ReplicatedSpriteBase.New(...)
 
 	self.ModelVarianceSeed = math.random(1, 1000000)
 	self.ModelKey = nil
+
 	self.Position = Vector3.zero
+	self.LastSentPosition = Vector3.zero
 
 	self.Replicate = true
 
