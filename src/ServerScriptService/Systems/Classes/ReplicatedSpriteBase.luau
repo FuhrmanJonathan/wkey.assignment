@@ -14,6 +14,7 @@ function ReplicatedSpriteBase.New(...)
 	self.LastSentPosition = Vector3.zero
 
 	self.Replicate = true
+	self.Priority = false
 
 	return self
 end

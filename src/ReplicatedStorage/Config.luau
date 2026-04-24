@@ -1,5 +1,5 @@
 local Config = {}
 
-Config.YLevel = 10
+Config.YLevel = 9.5
 
 return Config

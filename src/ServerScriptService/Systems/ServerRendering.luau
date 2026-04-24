@@ -8,12 +8,18 @@ local RenderSpawn = Remotes:WaitForChild("RenderSpawn")
 local RenderUpdate = Remotes:WaitForChild("RenderUpdate")
 local RenderDestroy = Remotes:WaitForChild("RenderDestroy")
 local RenderEvent = Remotes:WaitForChild("RenderEvent")
+local ModelClicked = Remotes:WaitForChild("ModelClicked")
 
 local ServerRendering = {}
 
 ServerRendering.ReplicatedObjects = {}
+
 ServerRendering.LastUpdate = 0
+ServerRendering.PriorityLastUpdate = 0
+
 ServerRendering.UpdateInterval = 0.25
+ServerRendering.PriorityUpdateInterval = 0.05
+
 ServerRendering.PositionThreshold = 0.1
 ServerRendering.PositionPrecision = 10
 ServerRendering.Started = false
@@ -44,12 +50,29 @@ function ServerRendering:Start()
 	RunService.Heartbeat:Connect(function()
 		local CurrentTime = os.clock()
 
-		if CurrentTime - self.LastUpdate < self.UpdateInterval then
-			return
+		if CurrentTime - self.PriorityLastUpdate >= self.PriorityUpdateInterval then
+			self.PriorityLastUpdate = CurrentTime
+			self:SendUpdates(true)
 		end
 
-		self.LastUpdate = CurrentTime
-		self:SendUpdates()
+		if CurrentTime - self.LastUpdate >= self.UpdateInterval then
+			self.LastUpdate = CurrentTime
+			self:SendUpdates(false)
+		end
+	end)
+
+	ModelClicked.OnServerEvent:Connect(function(Player, ObjectId)
+		local Object = nil
+		for _, Obj in pairs(self.ReplicatedObjects) do
+			if Obj.ObjectId == ObjectId then
+				Object = Obj
+				break
+			end
+		end
+
+		if Object then
+			print(Object.ObjectId .. " clicked by " .. Player.Name .. " [SERVER]")
+		end
 	end)
 end
 
@@ -115,24 +138,42 @@ function ServerRendering:FireEvent(ObjectId, EventName, Data)
 	RenderEvent:FireAllClients(ObjectId, EventName, Data)
 end
 
-function ServerRendering:SendUpdates()
+function ServerRendering:ShouldSendObject(Object, Position)
+	local LastSentPosition = Object.LastSentPosition
+
+	if not LastSentPosition then
+		return true
+	end
+
+	return (Position - LastSentPosition).Magnitude >= self.PositionThreshold
+end
+
+function ServerRendering:AddObjectToPacket(Packet, ObjectId, Object, Position)
+	Object.LastSentPosition = Position
+
+	Packet[#Packet + 1] = {
+		ObjectId,
+		Quantize(Position.X, self.PositionPrecision),
+		Quantize(Position.Z, self.PositionPrecision),
+	}
+end
+
+function ServerRendering:SendUpdates(PriorityOnly)
 	local Packet = {}
 
 	for ObjectId, Object in pairs(self.ReplicatedObjects) do
+		if PriorityOnly and not Object.Priority then
+			continue
+		end
+
+		if not PriorityOnly and Object.Priority then
+			continue
+		end
+
 		local Position = Object.Position
 
-		if Position then
-			local LastSentPosition = Object.LastSentPosition
-
-			if not LastSentPosition or (Position - LastSentPosition).Magnitude >= self.PositionThreshold then
-				Object.LastSentPosition = Position
-
-				Packet[#Packet + 1] = {
-					ObjectId,
-					Quantize(Position.X, self.PositionPrecision),
-					Quantize(Position.Z, self.PositionPrecision),
-				}
-			end
+		if Position and self:ShouldSendObject(Object, Position) then
+			self:AddObjectToPacket(Packet, ObjectId, Object, Position)
 		end
 	end
 

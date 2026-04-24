@@ -51,12 +51,26 @@ function ClientRendering:Start()
 	end)
 end
 
-function ClientRendering:GetPositionFromData(X, Z)
+function ClientRendering:GetBasePositionFromData(X, Z)
 	return Vector3.new(
 		Dequantize(X, self.PositionPrecision),
 		Config.YLevel,
 		Dequantize(Z, self.PositionPrecision)
 	)
+end
+
+function ClientRendering:GetPositionFromData(X, Z, YOffset)
+	return self:GetBasePositionFromData(X, Z) + Vector3.new(0, YOffset or 0, 0)
+end
+
+function ClientRendering:GetModelYOffset(Model)
+	local BoundingCFrame, BoundingSize = Model:GetBoundingBox()
+	local PivotPosition = Model:GetPivot().Position
+
+	local BottomY = BoundingCFrame.Position.Y - (BoundingSize.Y / 2)
+	local OffsetFromBottomToPivot = PivotPosition.Y - BottomY
+
+	return OffsetFromBottomToPivot
 end
 
 function ClientRendering:CreateObject(SpawnData)
@@ -70,28 +84,25 @@ function ClientRendering:CreateObject(SpawnData)
 		return
 	end
 
-	local Position = self:GetPositionFromData(SpawnData.X, SpawnData.Z)
+	local YOffset = self:GetModelYOffset(Model)
+	local Position = self:GetPositionFromData(SpawnData.X, SpawnData.Z, YOffset)
 
 	Model:PivotTo(CFrame.new(Position))
 	Model.Parent = workspace
+	Model.Name = SpawnData.ObjectId
 
 	self.VisualObjects[SpawnData.ObjectId] = {
-		ObjectId          = SpawnData.ObjectId,
-		Model             = Model,
-		ModelKey          = SpawnData.ModelKey,
+		ObjectId = SpawnData.ObjectId,
+		Model = Model,
+		ModelKey = SpawnData.ModelKey,
 		ModelVarianceSeed = SpawnData.ModelVarianceSeed,
 
-		-- The smoothed visual position driven each RenderStepped
-		CurrentPosition   = Position,
+		YOffset = YOffset,
 
-		-- Last authoritative position received from the server
-		ServerPosition    = Position,
-
-		-- Estimated movement per second derived from consecutive server updates
-		Velocity          = Vector3.zero,
-
-		-- tick() timestamp of the most recent server update
-		LastUpdateTime    = tick(),
+		CurrentPosition = Position,
+		ServerPosition = Position,
+		Velocity = Vector3.zero,
+		LastUpdateTime = tick(),
 	}
 end
 
@@ -108,12 +119,12 @@ function ClientRendering:ApplyUpdates(UpdatePacket)
 			continue
 		end
 
-		local NewServerPosition = self:GetPositionFromData(X, Z)
+		local NewServerPosition = self:GetPositionFromData(X, Z, VisualObject.YOffset)
 		local DeltaTime = Now - VisualObject.LastUpdateTime
 
 		if DeltaTime >= 0.005 then
 			local Displacement = NewServerPosition - VisualObject.ServerPosition
-			VisualObject.Velocity  = Displacement / DeltaTime
+			VisualObject.Velocity = Displacement / DeltaTime
 		end
 
 		VisualObject.ServerPosition = NewServerPosition
@@ -152,11 +163,18 @@ function ClientRendering:RenderStep(DeltaTime)
 			0,
 			1
 		)
+
 		local DecayedVelocity = VisualObject.Velocity * VelocityWeight
-		local PredictedPosition = VisualObject.ServerPosition
-			+ DecayedVelocity * TimeSinceUpdate
+		local PredictedPosition = VisualObject.ServerPosition + DecayedVelocity * TimeSinceUpdate
+
+		PredictedPosition = Vector3.new(
+			PredictedPosition.X,
+			Config.YLevel + VisualObject.YOffset,
+			PredictedPosition.Z
+		)
 
 		local Alpha = math.clamp(DeltaTime * self.CorrectionSpeed, 0, 1)
+
 		VisualObject.CurrentPosition =
 			VisualObject.CurrentPosition:Lerp(PredictedPosition, Alpha)
 
